@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSP Oyunu - VRPGame</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚚 TSP Oyunu</h1>
+            <p>En kısa yolu bularak tüm müşterileri ziyaret edin!</p>
+        </header>
+
+        <div class="game-info">
+            <div class="info-box">
+                <span class="label">Ziyaret Edilen:</span>
+                <span id="visitedCount" class="value">0/10</span>
+            </div>
+            <div class="info-box">
+                <span class="label">Mesafe:</span>
+                <span id="currentDistance" class="value">0 km</span>
+            </div>
+            <div class="info-box">
+                <span class="label">Optimal Mesafe:</span>
+                <span id="optimalDistance" class="value">? km</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn btn-primary">🎮 Oyunu Başlat</button>
+            <button id="resetBtn" class="btn btn-secondary" disabled>🔄 Yeniden Başlat</button>
+            <button id="showSolutionBtn" class="btn btn-info" disabled>💡 Optimal Rotayı Göster</button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <div id="resultModal" class="modal">
+            <div class="modal-content">
+                <h2 id="resultTitle"></h2>
+                <p id="resultMessage"></p>
+                <button id="closeModalBtn" class="btn btn-primary">Tamam</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Nasıl Oynanır?</h3>
+            <ul>
+                <li>🏠 Yeşil düğüm <strong>başlangıç noktası</strong> (depo)</li>
+                <li>🔵 Mavi düğümler <strong>müşteri noktaları</strong></li>
+                <li>Başlangıç noktasından başlayarak tüm müşterileri ziyaret edin</li>
+                <li>Son olarak tekrar başlangıç noktasına dönün</li>
+                <li>En kısa toplam mesafeyi bulmaya çalışın!</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="tsp-solver.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
