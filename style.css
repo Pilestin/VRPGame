@@ -37,6 +37,24 @@ header p {
     color: #666;
 }
 
+.node-input {
+    width: 80px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid #667eea;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #667eea;
+    text-align: center;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.node-input:focus {
+    box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
+}
+
+
 .game-info {
     display: flex;
     justify-content: space-around;

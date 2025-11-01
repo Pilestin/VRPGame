@@ -1,407 +1,212 @@
+// Canvas ve global değişkenler
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let nodes = [];
+let userRoute = [];
+let totalDistance = 0;
+let gameActive = false;
+let solver;
+
+// Canvas boyutlarını ayarla
+canvas.width = canvas.clientWidth;
+canvas.height = canvas.clientHeight;
+
 /**
- * TSP Game - Ana oyun mantığı
+ * Rastgele node'lar oluşturur
  */
-
-class TSPGame {
-    constructor() {
-        this.canvas = document.getElementById('gameCanvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.nodes = [];
-        this.visitedNodes = [];
-        this.currentRoute = [];
-        this.optimalRoute = [];
-        this.optimalDistance = 0;
-        this.currentDistance = 0;
-        this.gameStarted = false;
-        this.gameFinished = false;
-        this.showingOptimal = false;
-
-        this.NODE_RADIUS = 15;
-        this.DEPOT_COLOR = '#10b981'; // Yeşil
-        this.CUSTOMER_COLOR = '#3b82f6'; // Mavi
-        this.VISITED_COLOR = '#f59e0b'; // Turuncu
-        this.LINE_COLOR = '#6366f1'; // Mor
-        this.OPTIMAL_LINE_COLOR = '#10b981'; // Yeşil
-
-        this.initCanvas();
-        this.initEventListeners();
-    }
-
-    initCanvas() {
-        // Canvas boyutunu ayarla
-        const container = this.canvas.parentElement;
-        this.canvas.width = container.clientWidth;
-        this.canvas.height = 600;
-    }
-
-    initEventListeners() {
-        // Başlat butonu
-        document.getElementById('startBtn').addEventListener('click', () => this.startGame());
-
-        // Yeniden başlat butonu
-        document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
-
-        // Optimal rotayı göster butonu
-        document.getElementById('showSolutionBtn').addEventListener('click', () => this.toggleOptimalRoute());
-
-        // Canvas tıklama
-        this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-
-        // Modal kapat
-        document.getElementById('closeModalBtn').addEventListener('click', () => this.closeModal());
-
-        // Pencere boyutu değiştiğinde
-        window.addEventListener('resize', () => {
-            this.initCanvas();
-            this.draw();
+function generateNodes() {
+    nodes = [];
+    const nodeCountInput = document.getElementById("nodeCountInput");
+    const nodeCount = parseInt(nodeCountInput?.value) || 10; // varsayılan 10
+    
+    for (let i = 0; i < nodeCount; i++) {
+        nodes.push({
+            id: i,
+            x: Math.random() * (canvas.width - 40) + 20,
+            y: Math.random() * (canvas.height - 40) + 20
         });
     }
 
-    startGame() {
-        this.generateNodes();
-        this.calculateOptimalRoute();
-        this.gameStarted = true;
-        this.gameFinished = false;
-        this.showingOptimal = false;
-
-        // Depoyu otomatik olarak ziyaret edilmiş say
-        this.visitedNodes.push(this.nodes[0]);
-        this.currentRoute.push(this.nodes[0]);
-
-        document.getElementById('startBtn').disabled = true;
-        document.getElementById('resetBtn').disabled = false;
-        document.getElementById('showSolutionBtn').disabled = false;
-
-        this.updateUI();
-        this.draw();
-    }
-
-    generateNodes() {
-        this.nodes = [];
-        const padding = 50;
-        const width = this.canvas.width - 2 * padding;
-        const height = this.canvas.height - 2 * padding;
-
-        // İlk node depo (başlangıç noktası)
-        const depot = {
-            id: 0,
-            x: padding + Math.random() * width,
-            y: padding + Math.random() * height,
-            isDepot: true
-        };
-        this.nodes.push(depot);
-
-        // 9 müşteri noktası daha ekle (toplam 10)
-        for (let i = 1; i < 10; i++) {
-            let node;
-            let attempts = 0;
-            const maxAttempts = 100;
-
-            // Node'lar birbirine çok yakın olmasın
-            do {
-                node = {
-                    id: i,
-                    x: padding + Math.random() * width,
-                    y: padding + Math.random() * height,
-                    isDepot: false
-                };
-                attempts++;
-            } while (this.isTooClose(node) && attempts < maxAttempts);
-
-            this.nodes.push(node);
-        }
-    }
-
-    isTooClose(newNode, minDistance = 60) {
-        for (const node of this.nodes) {
-            const dx = node.x - newNode.x;
-            const dy = node.y - newNode.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < minDistance) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    calculateOptimalRoute() {
-        const solver = new TSPSolver(this.nodes);
-        const solution = solver.solveMultiStart(10);
-        this.optimalRoute = solution.route;
-        this.optimalDistance = solution.distance;
-    }
-
-    handleCanvasClick(e) {
-        if (!this.gameStarted || this.gameFinished) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Tıklanan node'u bul
-        const clickedNode = this.findNodeAt(x, y);
-
-        if (clickedNode && !this.isVisited(clickedNode)) {
-            // Node'u ziyaret et
-            this.visitNode(clickedNode);
-        }
-    }
-
-    findNodeAt(x, y) {
-        for (const node of this.nodes) {
-            const dx = node.x - x;
-            const dy = node.y - y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance <= this.NODE_RADIUS) {
-                return node;
-            }
-        }
-        return null;
-    }
-
-    isVisited(node) {
-        return this.visitedNodes.includes(node);
-    }
-
-    visitNode(node) {
-        this.visitedNodes.push(node);
-        this.currentRoute.push(node);
-
-        // Son node'dan önceki node'a olan mesafeyi ekle
-        if (this.currentRoute.length > 1) {
-            const prevNode = this.currentRoute[this.currentRoute.length - 2];
-            this.currentDistance += this.calculateDistance(prevNode, node);
-        }
-
-        this.updateUI();
-        this.draw();
-
-        // Tüm müşteriler ziyaret edildi mi?
-        if (this.visitedNodes.length === this.nodes.length) {
-            this.checkCompletion();
-        }
-    }
-
-    checkCompletion() {
-        // Depoya dönüş mesafesini ekle
-        const lastNode = this.currentRoute[this.currentRoute.length - 1];
-        const depot = this.nodes[0];
-        this.currentDistance += this.calculateDistance(lastNode, depot);
-        this.currentRoute.push(depot);
-
-        this.gameFinished = true;
-        this.updateUI();
-        this.draw();
-
-        // Sonucu kontrol et
-        const tolerance = 0.05; // %5 tolerans
-        const difference = Math.abs(this.currentDistance - this.optimalDistance);
-        const percentDiff = (difference / this.optimalDistance) * 100;
-
-        setTimeout(() => {
-            if (percentDiff <= tolerance * 100) {
-                this.showResult(true, 'Tebrikler! 🎉', 
-                    `Optimal rotayı buldunuz!<br>Mesafe: ${this.currentDistance.toFixed(2)} km`);
-            } else if (percentDiff <= 10) {
-                this.showResult(false, 'Çok İyi! 👏', 
-                    `Optimal rotaya çok yakınsınız!<br>Sizin: ${this.currentDistance.toFixed(2)} km<br>Optimal: ${this.optimalDistance.toFixed(2)} km<br>Fark: %${percentDiff.toFixed(1)}`);
-            } else {
-                this.showResult(false, 'Oyun Bitti! 🤔', 
-                    `Daha iyi yapabilirsiniz!<br>Sizin: ${this.currentDistance.toFixed(2)} km<br>Optimal: ${this.optimalDistance.toFixed(2)} km<br>Fark: %${percentDiff.toFixed(1)}`);
-            }
-        }, 500);
-    }
-
-    calculateDistance(node1, node2) {
-        const dx = node1.x - node2.x;
-        const dy = node1.y - node2.y;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
-    toggleOptimalRoute() {
-        this.showingOptimal = !this.showingOptimal;
-        const btn = document.getElementById('showSolutionBtn');
-        btn.textContent = this.showingOptimal ? '🔍 Rotayı Gizle' : '💡 Optimal Rotayı Göster';
-        this.draw();
-    }
-
-    resetGame() {
-        this.nodes = [];
-        this.visitedNodes = [];
-        this.currentRoute = [];
-        this.optimalRoute = [];
-        this.optimalDistance = 0;
-        this.currentDistance = 0;
-        this.gameStarted = false;
-        this.gameFinished = false;
-        this.showingOptimal = false;
-
-        document.getElementById('startBtn').disabled = false;
-        document.getElementById('resetBtn').disabled = true;
-        document.getElementById('showSolutionBtn').disabled = true;
-        document.getElementById('showSolutionBtn').textContent = '💡 Optimal Rotayı Göster';
-
-        this.updateUI();
-        this.draw();
-    }
-
-    updateUI() {
-        document.getElementById('visitedCount').textContent = 
-            `${this.visitedNodes.length}/${this.nodes.length}`;
-        
-        document.getElementById('currentDistance').textContent = 
-            `${this.currentDistance.toFixed(2)} km`;
-        
-        document.getElementById('optimalDistance').textContent = 
-            this.gameStarted ? `${this.optimalDistance.toFixed(2)} km` : '? km';
-    }
-
-    draw() {
-        // Canvas'ı temizle
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        if (this.nodes.length === 0) {
-            this.drawWelcomeScreen();
-            return;
-        }
-
-        // Optimal rotayı göster (arka planda)
-        if (this.showingOptimal) {
-            this.drawOptimalRoute();
-        }
-
-        // Mevcut rotayı çiz
-        this.drawCurrentRoute();
-
-        // Node'ları çiz
-        this.drawNodes();
-    }
-
-    drawWelcomeScreen() {
-        this.ctx.fillStyle = '#667eea';
-        this.ctx.font = 'bold 24px Segoe UI';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('Oyunu başlatmak için "Oyunu Başlat" butonuna tıklayın', 
-            this.canvas.width / 2, this.canvas.height / 2);
-    }
-
-    drawOptimalRoute() {
-        if (this.optimalRoute.length < 2) return;
-
-        this.ctx.strokeStyle = this.OPTIMAL_LINE_COLOR;
-        this.ctx.lineWidth = 3;
-        this.ctx.setLineDash([10, 5]);
-        this.ctx.globalAlpha = 0.5;
-
-        this.ctx.beginPath();
-        for (let i = 0; i < this.optimalRoute.length; i++) {
-            const node = this.optimalRoute[i];
-            if (i === 0) {
-                this.ctx.moveTo(node.x, node.y);
-            } else {
-                this.ctx.lineTo(node.x, node.y);
-            }
-        }
-        // Depoya dön
-        this.ctx.lineTo(this.optimalRoute[0].x, this.optimalRoute[0].y);
-        this.ctx.stroke();
-
-        this.ctx.setLineDash([]);
-        this.ctx.globalAlpha = 1;
-    }
-
-    drawCurrentRoute() {
-        if (this.currentRoute.length < 2) return;
-
-        this.ctx.strokeStyle = this.LINE_COLOR;
-        this.ctx.lineWidth = 3;
-
-        this.ctx.beginPath();
-        for (let i = 0; i < this.currentRoute.length; i++) {
-            const node = this.currentRoute[i];
-            if (i === 0) {
-                this.ctx.moveTo(node.x, node.y);
-            } else {
-                this.ctx.lineTo(node.x, node.y);
-            }
-        }
-        this.ctx.stroke();
-
-        // Ok işaretleri çiz
-        for (let i = 1; i < this.currentRoute.length; i++) {
-            const from = this.currentRoute[i - 1];
-            const to = this.currentRoute[i];
-            this.drawArrow(from, to);
-        }
-    }
-
-    drawArrow(from, to) {
-        const headlen = 15;
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        const angle = Math.atan2(dy, dx);
-
-        // Ok başı pozisyonu (node'un kenarında)
-        const arrowX = to.x - Math.cos(angle) * this.NODE_RADIUS;
-        const arrowY = to.y - Math.sin(angle) * this.NODE_RADIUS;
-
-        this.ctx.fillStyle = this.LINE_COLOR;
-        this.ctx.beginPath();
-        this.ctx.moveTo(arrowX, arrowY);
-        this.ctx.lineTo(arrowX - headlen * Math.cos(angle - Math.PI / 6),
-                        arrowY - headlen * Math.sin(angle - Math.PI / 6));
-        this.ctx.lineTo(arrowX - headlen * Math.cos(angle + Math.PI / 6),
-                        arrowY - headlen * Math.sin(angle + Math.PI / 6));
-        this.ctx.closePath();
-        this.ctx.fill();
-    }
-
-    drawNodes() {
-        for (const node of this.nodes) {
-            const isVisited = this.isVisited(node);
-            
-            // Node dairesi
-            this.ctx.beginPath();
-            this.ctx.arc(node.x, node.y, this.NODE_RADIUS, 0, 2 * Math.PI);
-            
-            if (node.isDepot) {
-                this.ctx.fillStyle = this.DEPOT_COLOR;
-            } else if (isVisited) {
-                this.ctx.fillStyle = this.VISITED_COLOR;
-            } else {
-                this.ctx.fillStyle = this.CUSTOMER_COLOR;
-            }
-            
-            this.ctx.fill();
-            this.ctx.strokeStyle = 'white';
-            this.ctx.lineWidth = 3;
-            this.ctx.stroke();
-
-            // Node numarası/ikonu
-            this.ctx.fillStyle = 'white';
-            this.ctx.font = 'bold 14px Segoe UI';
-            this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'middle';
-            
-            if (node.isDepot) {
-                this.ctx.fillText('🏠', node.x, node.y);
-            } else {
-                this.ctx.fillText(node.id.toString(), node.x, node.y);
-            }
-        }
-    }
-
-    showResult(isWin, title, message) {
-        const modal = document.getElementById('resultModal');
-        document.getElementById('resultTitle').innerHTML = title;
-        document.getElementById('resultMessage').innerHTML = message;
-        modal.style.display = 'block';
-    }
-
-    closeModal() {
-        document.getElementById('resultModal').style.display = 'none';
-    }
+    document.getElementById("visitedCount").textContent = `0/${nodeCount}`;
 }
 
-// Oyunu başlat
-const game = new TSPGame();
+/**
+ * Canvas'ı temizleyip tüm node'ları ve rotaları çizer
+ */
+function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Kullanıcı rotası çiz
+    if (userRoute.length > 1) {
+        ctx.beginPath();
+        ctx.strokeStyle = "#764ba2";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < userRoute.length - 1; i++) {
+            const a = userRoute[i];
+            const b = userRoute[i + 1];
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+        }
+        ctx.stroke();
+    }
+
+    // Node'ları çiz
+    nodes.forEach((node, index) => {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = index === 0 ? "green" : "dodgerblue"; // depo: yeşil, müşteri: mavi
+        ctx.fill();
+        ctx.strokeStyle = "white";
+        ctx.stroke();
+
+        // ID yazısı
+        ctx.fillStyle = "white";
+        ctx.font = "bold 12px Arial";
+        ctx.fillText(index, node.x - 4, node.y + 4);
+    });
+}
+
+/**
+ * İki nokta arasındaki Öklid mesafesi
+ */
+function distance(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Canvas tıklama olayı
+ */
+canvas.addEventListener("click", (event) => {
+    if (!gameActive) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // En yakın node’u bul
+    let nearestNode = null;
+    let minDist = 20; // tıklama toleransı
+    for (const node of nodes) {
+        const d = Math.sqrt((node.x - x) ** 2 + (node.y - y) ** 2);
+        if (d < minDist) {
+            nearestNode = node;
+            minDist = d;
+        }
+    }
+
+    // Node tıklanmadıysa çık
+    if (!nearestNode) return;
+
+    // Daha önce ziyaret edilmişse atla
+    if (userRoute.includes(nearestNode)) return;
+
+    // İlk node depo olmalı
+    if (userRoute.length === 0 && nearestNode.id !== 0) {
+        alert("İlk olarak depo (yeşil) noktasından başlamalısın!");
+        return;
+    }
+
+    userRoute.push(nearestNode);
+
+    // Mesafeyi güncelle
+    if (userRoute.length > 1) {
+        const prev = userRoute[userRoute.length - 2];
+        totalDistance += distance(prev, nearestNode);
+    }
+
+    // UI güncelle
+    document.getElementById("visitedCount").textContent = `${userRoute.length}/${nodes.length}`;
+    document.getElementById("currentDistance").textContent = `${totalDistance.toFixed(2)} km`;
+
+    drawGame();
+
+    // Tüm noktalar ziyaret edildiyse depoya dön
+    if (userRoute.length === nodes.length) {
+        totalDistance += distance(userRoute[userRoute.length - 1], userRoute[0]);
+        document.getElementById("currentDistance").textContent = `${totalDistance.toFixed(2)} km`;
+        gameActive = false;
+        showResult();
+    }
+});
+
+/**
+ * Oyunu başlat
+ */
+document.getElementById("startBtn").addEventListener("click", () => {
+    gameActive = true;
+    userRoute = [];
+    totalDistance = 0;
+
+    generateNodes();
+    drawGame();
+
+    document.getElementById("resetBtn").disabled = false;
+    document.getElementById("showSolutionBtn").disabled = false;
+
+    // Optimal çözüm önceden hesapla
+    solver = new TSPSolver(nodes);
+    const solution = solver.solve();
+    document.getElementById("optimalDistance").textContent = `${solution.distance.toFixed(2)} km`;
+});
+
+/**
+ * Yeniden başlat
+ */
+document.getElementById("resetBtn").addEventListener("click", () => {
+    gameActive = false;
+    userRoute = [];
+    totalDistance = 0;
+    document.getElementById("currentDistance").textContent = "0 km";
+    document.getElementById("visitedCount").textContent = `0/${nodes.length}`;
+    drawGame();
+});
+
+/**
+ * Optimal rotayı göster
+ */
+document.getElementById("showSolutionBtn").addEventListener("click", () => {
+    if (!solver || !solver.bestRoute.length) return;
+
+    const route = solver.bestRoute;
+
+    drawGame();
+
+    // Optimal rotayı turuncu renkle çiz
+    ctx.beginPath();
+    ctx.strokeStyle = "orange";
+    ctx.lineWidth = 3;
+    for (let i = 0; i < route.length; i++) {
+        const a = route[i];
+        const b = route[(i + 1) % route.length];
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
+});
+
+/**
+ * Sonuç modalını göster
+ */
+function showResult() {
+    const modal = document.getElementById("resultModal");
+    const resultTitle = document.getElementById("resultTitle");
+    const resultMessage = document.getElementById("resultMessage");
+
+    const optimal = solver.bestDistance;
+    const ratio = (totalDistance / optimal) * 100;
+
+    resultTitle.textContent = "Oyun Bitti!";
+    resultMessage.innerHTML = `
+        Toplam Mesafen: <strong>${totalDistance.toFixed(2)} km</strong><br>
+        Optimal Mesafe: <strong>${optimal.toFixed(2)} km</strong><br>
+        Performans: <strong>${ratio.toFixed(1)}%</strong> (optimalin ${(ratio - 100).toFixed(1)}% fazlası)
+    `;
+
+    modal.style.display = "block";
+}
+
+document.getElementById("closeModalBtn").addEventListener("click", () => {
+    document.getElementById("resultModal").style.display = "none";
+});
