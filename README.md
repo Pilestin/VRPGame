@@ -16,3 +16,12 @@ TR: Web üzerinde oynanan, VRP tabanlı bir puzzle/oyun. Oyuncu harita üzerinde
 - ESOGU dataseti -> arka planda gerçek harita entregrasyonu
 - Oyuncu performansının kaydedilmesi ve liderlik tablosu
 - Oyun içi ipuçları ve rehberlik sisteminin eklenmesi
+>  Not: Bu proje henüz geliştirme aşamasındadır.
+
+
+### 🌐 **Canlı Demo**
+<p align="center">
+  <a href="https://pilestin.github.io/VRPGame/" target="_blank">
+    <img src="https://img.shields.io/badge/🎮%20TSP%20Oyunu%20Denemek%20İçin%20Tıklayın-4CAF50?style=for-the-badge&logo=github&logoColor=white" alt="TSP Oyunu Linki">
+  </a>
+</p>
